@@ -28,8 +28,8 @@ shows now‑playing music and expands on hover with playback controls.
 
 ## Install
 
-Download **`Island-1.0.0.dmg`** from the latest
-[release](https://github.com/elvinmonke/island/releases), open it, and drag
+Download the latest DMG from the
+[releases page](https://github.com/elvinmonke/island/releases/latest), open it, and drag
 **Island.app** into your Applications folder.
 
 On first launch macOS will ask permission for **Apple Events** — this is how
