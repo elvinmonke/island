@@ -55,10 +55,12 @@ final class IslandWindowController {
         let screen = NSScreen.main ?? NSScreen.screens.first!
         let size = p.frame.size
 
-        // Pin to the absolute top of the screen so the pill fuses with the
-        // notch.  The SwiftUI view clips its top edge tight, so the pill
-        // appears to grow out of the hardware notch / menu bar region.
-        let topY = screen.frame.maxY + 6
+        // Position just below the notch/menu bar so content is never obscured.
+        // safeAreaInsets.top > 0 means there's a notch.
+        let hasNotch = screen.safeAreaInsets.top > 0
+        let topY = hasNotch
+            ? screen.frame.maxY - screen.safeAreaInsets.top
+            : screen.visibleFrame.maxY
         let origin = NSPoint(
             x: screen.frame.midX - size.width / 2,
             y: topY - size.height - CGFloat(settings.verticalOffset)
