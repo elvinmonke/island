@@ -2,11 +2,12 @@ import SwiftUI
 
 struct IslandView: View {
     @EnvironmentObject var vm: IslandViewModel
+    @EnvironmentObject var settings: AppSettings
     @State private var hovering = false
 
     var body: some View {
         GeometryReader { geo in
-            let expanded = hovering || vm.forceExpanded
+            let expanded = (settings.expandOnHover && hovering) || vm.forceExpanded
             let width: CGFloat = expanded ? 460 : (vm.hasContent ? 240 : 200)
             let height: CGFloat = expanded ? 120 : 34
 
@@ -79,16 +80,19 @@ struct CollapsedContent: View {
 
 struct ExpandedContent: View {
     @EnvironmentObject var vm: IslandViewModel
+    @EnvironmentObject var settings: AppSettings
     var body: some View {
         HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(colors: [.pink, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
-                Image(systemName: "music.note")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
+            if settings.showArtwork {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(LinearGradient(colors: [.pink, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    Image(systemName: "music.note")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 60, height: 60)
             }
-            .frame(width: 60, height: 60)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(vm.title.isEmpty ? "Nothing playing" : vm.title)

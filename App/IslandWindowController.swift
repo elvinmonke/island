@@ -8,18 +8,22 @@ final class IslandPanel: NSPanel {
 
 final class IslandWindowController {
     private var panel: IslandPanel?
-    private let viewModel = IslandViewModel()
+    let viewModel: IslandViewModel
+    let settings: AppSettings
+
+    init(viewModel: IslandViewModel, settings: AppSettings) {
+        self.viewModel = viewModel
+        self.settings = settings
+        NotificationCenter.default.addObserver(
+            forName: AppSettings.changed, object: nil, queue: .main
+        ) { [weak self] _ in self?.reposition() }
+    }
 
     func show() {
         guard panel == nil else { return }
-        let screen = NSScreen.main ?? NSScreen.screens.first!
         let size = NSSize(width: 560, height: 180)
-        let origin = NSPoint(
-            x: screen.frame.midX - size.width / 2,
-            y: screen.frame.maxY - size.height + 2
-        )
         let p = IslandPanel(
-            contentRect: NSRect(origin: origin, size: size),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -33,16 +37,42 @@ final class IslandWindowController {
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         p.hidesOnDeactivate = false
 
-        let host = NSHostingView(rootView: IslandView().environmentObject(viewModel))
+        let host = NSHostingView(
+            rootView: IslandView()
+                .environmentObject(viewModel)
+                .environmentObject(settings)
+        )
         host.frame = NSRect(origin: .zero, size: size)
         host.autoresizingMask = [.width, .height]
         p.contentView = host
-        p.orderFrontRegardless()
         panel = p
+        reposition()
+        if settings.visible { p.orderFrontRegardless() }
+    }
+
+    func reposition() {
+        guard let p = panel else { return }
+        let screen = NSScreen.main ?? NSScreen.screens.first!
+        let size = p.frame.size
+
+        // Sit just below the menu bar (visibleFrame.maxY) so we never
+        // collide with the notch on MacBooks that have one.
+        let topY = screen.visibleFrame.maxY - CGFloat(settings.verticalOffset)
+        let origin = NSPoint(
+            x: screen.frame.midX - size.width / 2,
+            y: topY - size.height
+        )
+        p.setFrameOrigin(origin)
+
+        if settings.visible {
+            p.orderFrontRegardless()
+        } else {
+            p.orderOut(nil)
+        }
     }
 
     func toggle() {
-        guard let p = panel else { show(); return }
-        if p.isVisible { p.orderOut(nil) } else { p.orderFrontRegardless() }
+        settings.visible.toggle()
+        reposition()
     }
 }
