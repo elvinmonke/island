@@ -21,7 +21,7 @@ final class IslandWindowController {
 
     func show() {
         guard panel == nil else { return }
-        let size = NSSize(width: 560, height: 180)
+        let size = NSSize(width: 560, height: 200)
         let p = IslandPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -55,12 +55,13 @@ final class IslandWindowController {
         let screen = NSScreen.main ?? NSScreen.screens.first!
         let size = p.frame.size
 
-        // Sit just below the menu bar (visibleFrame.maxY) so we never
-        // collide with the notch on MacBooks that have one.
-        let topY = screen.visibleFrame.maxY - CGFloat(settings.verticalOffset)
+        // Pin to the absolute top of the screen so the pill fuses with the
+        // notch.  The SwiftUI view clips its top edge tight, so the pill
+        // appears to grow out of the hardware notch / menu bar region.
+        let topY = screen.frame.maxY + 6
         let origin = NSPoint(
             x: screen.frame.midX - size.width / 2,
-            y: topY - size.height
+            y: topY - size.height - CGFloat(settings.verticalOffset)
         )
         p.setFrameOrigin(origin)
 

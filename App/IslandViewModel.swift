@@ -7,6 +7,7 @@ final class IslandViewModel: ObservableObject {
     @Published var artist: String = ""
     @Published var isPlaying: Bool = false
     @Published var forceExpanded: Bool = false
+    @Published var album: String = ""
 
     var hasContent: Bool { !title.isEmpty }
 
@@ -27,6 +28,7 @@ final class IslandViewModel: ObservableObject {
                 guard let self else { return }
                 self.title = info.title
                 self.artist = info.artist
+                self.album = info.album
                 self.isPlaying = info.isPlaying
             }
         }
@@ -42,7 +44,7 @@ final class IslandViewModel: ObservableObject {
 }
 
 enum NowPlaying {
-    struct Info { let title: String; let artist: String; let isPlaying: Bool }
+    struct Info { let title: String; let artist: String; let album: String; let isPlaying: Bool }
 
     static func fetch(completion: @escaping (Info) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
@@ -52,7 +54,7 @@ enum NowPlaying {
             if let info = query(app: "Music"), info.isPlaying || !info.title.isEmpty {
                 completion(info); return
             }
-            completion(Info(title: "", artist: "", isPlaying: false))
+            completion(Info(title: "", artist: "", album: "", isPlaying: false))
         }
     }
 
@@ -63,22 +65,24 @@ enum NowPlaying {
                 try
                     set t to name of current track
                     set a to artist of current track
+                    set al to album of current track
                     set s to player state as string
-                    return t & "|||" & a & "|||" & s
+                    return t & "|||" & a & "|||" & al & "|||" & s
                 on error
-                    return "|||" & "|||" & "stopped"
+                    return "|||" & "|||" & "|||" & "stopped"
                 end try
             end if
-            return "|||" & "|||" & "stopped"
+            return "|||" & "|||" & "|||" & "stopped"
         end if
         """
         guard let out = runAppleScript(script) else { return nil }
         let parts = out.components(separatedBy: "|||")
-        guard parts.count == 3 else { return nil }
-        let state = parts[2].lowercased()
+        guard parts.count == 4 else { return nil }
+        let state = parts[3].lowercased()
         return Info(
             title: parts[0].trimmingCharacters(in: .whitespacesAndNewlines),
             artist: parts[1].trimmingCharacters(in: .whitespacesAndNewlines),
+            album: parts[2].trimmingCharacters(in: .whitespacesAndNewlines),
             isPlaying: state.contains("playing")
         )
     }
