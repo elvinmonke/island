@@ -1,0 +1,29 @@
+name: Island
+options:
+  bundleIdPrefix: com.elvin
+  deploymentTarget:
+    macOS: "14.0"
+
+targets:
+  Island:
+    type: application
+    platform: macOS
+    deploymentTarget:
+      macOS: "14.0"
+    sources:
+      - App/
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.elvin.island
+      MARKETING_VERSION: 1.0.0
+      CURRENT_PROJECT_VERSION: 1
+      INFOPLIST_FILE: App/Info.plist
+      SWIFT_VERSION: "5.9"
+      CODE_SIGN_IDENTITY: "-"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      ENABLE_HARDENED_RUNTIME: NO
+      PRODUCT_NAME: Island
+    frameworks:
+      - AppKit
+      - SwiftUI
+      - Combine
+      - ScriptingBridge
