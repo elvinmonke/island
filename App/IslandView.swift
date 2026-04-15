@@ -31,16 +31,31 @@ struct IslandView: View {
         }
     }
 
+    // Idle = fully rounded capsule (top half clips behind bezel → notch looks like a pill)
+    // Active/Expanded = tight top corners flush with notch, round bottom as it drops down
+    private var topRadius: CGFloat {
+        state == .idle ? pillHeight / 2 : 12
+    }
+
+    private var bottomRadius: CGFloat {
+        pillHeight / 2
+    }
+
     var body: some View {
         GeometryReader { geo in
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     Spacer()
                     ZStack {
-                        RoundedRectangle(cornerRadius: pillHeight / 2, style: .continuous)
-                            .fill(Color(white: 0.04))
-                            .shadow(color: .black.opacity(state == .idle ? 0.2 : 0.45),
-                                    radius: state == .expanded ? 28 : 10, y: 6)
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: topRadius,
+                            bottomLeadingRadius: bottomRadius,
+                            bottomTrailingRadius: bottomRadius,
+                            topTrailingRadius: topRadius
+                        )
+                        .fill(Color(white: 0.04))
+                        .shadow(color: .black.opacity(state == .idle ? 0.2 : 0.45),
+                                radius: state == .expanded ? 28 : 10, y: 6)
 
                         Group {
                             switch state {
@@ -70,7 +85,7 @@ struct IslandView: View {
     }
 }
 
-// MARK: - Idle
+// MARK: - Idle: capsule morphing the notch
 
 struct IdleContent: View {
     var body: some View {
@@ -85,7 +100,7 @@ struct IdleContent: View {
     }
 }
 
-// MARK: - Active (music playing, not hovered)
+// MARK: - Active: extends with album + waveform
 
 struct ActiveContent: View {
     @EnvironmentObject var vm: IslandViewModel
@@ -152,7 +167,7 @@ struct WaveformBars: View {
     }
 }
 
-// MARK: - Expanded (hovered)
+// MARK: - Expanded: drops down with centered content
 
 struct ExpandedContent: View {
     @EnvironmentObject var vm: IslandViewModel
@@ -160,7 +175,6 @@ struct ExpandedContent: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Album art
             if settings.showArtwork {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -176,7 +190,6 @@ struct ExpandedContent: View {
                 .frame(width: 80, height: 80)
             }
 
-            // Info + controls centered
             VStack(spacing: 8) {
                 Text(vm.title.isEmpty ? "Nothing playing" : vm.title)
                     .font(.system(size: 15, weight: .semibold))
