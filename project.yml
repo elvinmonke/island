@@ -16,7 +16,7 @@ targets:
           - "**/*.iconset"
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.elvin.island
-      MARKETING_VERSION: 1.1.4
+      MARKETING_VERSION: 1.2.0
       CURRENT_PROJECT_VERSION: 1
       INFOPLIST_FILE: App/Info.plist
       SWIFT_VERSION: "5.9"
