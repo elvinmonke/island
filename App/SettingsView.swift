@@ -14,7 +14,7 @@ final class SettingsWindowController {
             return
         }
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 520),
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -43,7 +43,12 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     section("Appearance") {
                         Toggle("Show Island", isOn: $settings.visible)
-                        Toggle("Show album artwork when expanded", isOn: $settings.showArtwork)
+                        Toggle("Glass effect (vibrancy)", isOn: $settings.glassEffect)
+                        Toggle("Show album artwork", isOn: $settings.showArtwork)
+                    }
+                    section("Features") {
+                        Toggle("Volume / Brightness HUD", isOn: $settings.hudEnabled)
+                        Toggle("Calendar events", isOn: $settings.showCalendar)
                     }
                     section("Position") {
                         VStack(alignment: .leading, spacing: 6) {
@@ -86,7 +91,7 @@ struct SettingsView: View {
                 .padding(20)
             }
         }
-        .frame(minWidth: 420, minHeight: 420)
+        .frame(minWidth: 420, minHeight: 520)
     }
 
     private var header: some View {

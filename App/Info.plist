@@ -28,5 +28,9 @@
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>Island reads now-playing info from Music and Spotify.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Island shows your upcoming calendar events.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Island shows your upcoming calendar events.</string>
 </dict>
 </plist>

@@ -28,7 +28,8 @@ final class IslandWindowController {
             .sink { [weak self] _ in self?.resize() }
             .store(in: &cancellables)
 
-        viewModel.$isPlaying
+        viewModel.$nowPlaying
+            .map(\.isPlaying)
             .removeDuplicates()
             .sink { [weak self] _ in self?.resize() }
             .store(in: &cancellables)
@@ -37,23 +38,35 @@ final class IslandWindowController {
             .removeDuplicates()
             .sink { [weak self] _ in self?.resize() }
             .store(in: &cancellables)
+
+        viewModel.$activeHUD
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
+
+        viewModel.timerManager.$isRunning
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
     }
 
     private var currentState: IslandState {
+        if viewModel.activeHUD != nil { return .hud }
         if viewModel.notificationMonitor.activeNotification?.kind == .call { return .call }
         if viewModel.notificationMonitor.activeNotification != nil { return .notification }
         if viewModel.isHovering { return .expanded }
-        if viewModel.isPlaying { return .active }
+        if viewModel.isPlaying || viewModel.timerManager.isRunning { return .active }
         return .idle
     }
 
     private var pillSize: NSSize {
         switch currentState {
-        case .idle:          return NSSize(width: 190, height: 10)
-        case .active:        return NSSize(width: 340, height: 48)
-        case .expanded:      return NSSize(width: 420, height: 160)
-        case .notification:  return NSSize(width: 340, height: 52)
-        case .call:          return NSSize(width: 360, height: 140)
+        case .idle:         return NSSize(width: 190, height: 10)
+        case .active:       return NSSize(width: 340, height: 48)
+        case .expanded:     return NSSize(width: 440, height: 240)
+        case .hud:          return NSSize(width: 280, height: 48)
+        case .notification: return NSSize(width: 340, height: 52)
+        case .call:         return NSSize(width: 360, height: 140)
         }
     }
 
@@ -106,8 +119,6 @@ final class IslandWindowController {
         )
 
         let hasNotch = screen.safeAreaInsets.top > 0
-        // Top edge of the window sits right at the notch bottom so the pill
-        // is fused with the notch and drops downward when it expands.
         let topY = hasNotch
             ? screen.frame.maxY - screen.safeAreaInsets.top
             : screen.visibleFrame.maxY

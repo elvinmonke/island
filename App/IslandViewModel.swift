@@ -2,125 +2,151 @@ import Foundation
 import Combine
 import AppKit
 
-final class IslandViewModel: ObservableObject {
-    @Published var title: String = ""
-    @Published var artist: String = ""
-    @Published var isPlaying: Bool = false
-    @Published var forceExpanded: Bool = false
-    @Published var isHovering: Bool = false
-    @Published var album: String = ""
+enum HUDKind: Equatable {
+    case volume(Float)
+    case brightness(Float)
+}
 
+enum ActivityTab: Int, CaseIterable {
+    case nowPlaying, calendar, battery, timer
+}
+
+final class IslandViewModel: ObservableObject {
+    @Published var nowPlaying = NowPlayingInfo()
+    @Published var currentElapsed: Double = 0
+    @Published var activeTab: ActivityTab = .nowPlaying
+    @Published var isHovering: Bool = false
+    @Published var activeHUD: HUDKind? = nil
+
+    let volumeMonitor = VolumeMonitor()
+    let brightnessMonitor = BrightnessMonitor()
+    let batteryMonitor = BatteryMonitor()
+    let calendarMonitor = CalendarMonitor()
+    let timerManager = TimerManager()
     let notificationMonitor = NotificationMonitor()
 
-    var hasContent: Bool { !title.isEmpty }
+    var isPlaying: Bool { nowPlaying.isPlaying }
+    var hasContent: Bool { !nowPlaying.title.isEmpty }
+    var activeNotification: IslandNotification? { notificationMonitor.activeNotification }
 
-    private var timer: Timer?
+    private let mediaRemote = MediaRemoteBridge.shared
     private var cancellables = Set<AnyCancellable>()
+    private var hudDismissWork: DispatchWorkItem?
+    private var elapsedTimer: Timer?
+    private var pollTimer: Timer?
 
     init() {
-        refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            self?.refresh()
+        mediaRemote.register()
+        fetchNowPlaying()
+        setupObservers()
+        startElapsedTimer()
+    }
+
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            forName: MediaRemoteBridge.infoChanged, object: nil, queue: .main
+        ) { [weak self] _ in self?.fetchNowPlaying() }
+
+        NotificationCenter.default.addObserver(
+            forName: MediaRemoteBridge.appPlayingChanged, object: nil, queue: .main
+        ) { [weak self] _ in self?.fetchNowPlaying() }
+
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.fetchNowPlaying()
         }
+
+        volumeMonitor.$volume
+            .dropFirst()
+            .sink { [weak self] vol in self?.showHUD(.volume(vol)) }
+            .store(in: &cancellables)
+
+        brightnessMonitor.$brightness
+            .dropFirst()
+            .sink { [weak self] b in self?.showHUD(.brightness(b)) }
+            .store(in: &cancellables)
+
         notificationMonitor.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        batteryMonitor.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        calendarMonitor.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        timerManager.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
 
-    deinit { timer?.invalidate() }
+    private func startElapsedTimer() {
+        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let info = self.nowPlaying
+            guard info.isPlaying, info.duration > 0 else { return }
+            let timeSince = Date().timeIntervalSince(info.timestamp)
+            self.currentElapsed = min(info.elapsed + timeSince * info.playbackRate, info.duration)
+        }
+    }
+
+    func fetchNowPlaying() {
+        mediaRemote.fetch { [weak self] info in
+            guard let self else { return }
+            self.nowPlaying = info
+            if info.isPlaying { self.currentElapsed = info.elapsed }
+        }
+    }
+
+    // kept for menu item compat
+    func refresh() { fetchNowPlaying() }
+
+    // MARK: - Controls
+
+    func playPause() {
+        mediaRemote.togglePlayPause()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.fetchNowPlaying() }
+    }
+
+    func next() {
+        mediaRemote.nextTrack()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.fetchNowPlaying() }
+    }
+
+    func previous() {
+        mediaRemote.previousTrack()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.fetchNowPlaying() }
+    }
+
+    // MARK: - HUD
+
+    private func showHUD(_ kind: HUDKind) {
+        hudDismissWork?.cancel()
+        activeHUD = kind
+        let work = DispatchWorkItem { [weak self] in
+            self?.activeHUD = nil
+        }
+        hudDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: work)
+    }
+
+    // MARK: - Activity Cycling
+
+    func cycleActivity() {
+        let tabs = ActivityTab.allCases
+        guard let idx = tabs.firstIndex(of: activeTab) else { return }
+        activeTab = tabs[(idx + 1) % tabs.count]
+    }
 
     // MARK: - Notification shortcuts
-
-    var activeNotification: IslandNotification? { notificationMonitor.activeNotification }
 
     func acceptCall() { notificationMonitor.acceptCall() }
     func declineCall() { notificationMonitor.declineCall() }
     func dismissNotification() { notificationMonitor.dismissNotification() }
-
-    // MARK: - Now Playing
-
-    func refresh() {
-        NowPlaying.fetch { [weak self] info in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.title = info.title
-                self.artist = info.artist
-                self.album = info.album
-                self.isPlaying = info.isPlaying
-            }
-        }
-    }
-
-    func playPause() { NowPlaying.run("playpause"); bounce() }
-    func next() { NowPlaying.run("next"); bounce() }
-    func previous() { NowPlaying.run("previous"); bounce() }
-
-    private func bounce() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.refresh() }
-    }
-}
-
-enum NowPlaying {
-    struct Info { let title: String; let artist: String; let album: String; let isPlaying: Bool }
-
-    static func fetch(completion: @escaping (Info) -> Void) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            if let info = query(app: "Spotify"), info.isPlaying || !info.title.isEmpty {
-                completion(info); return
-            }
-            if let info = query(app: "Music"), info.isPlaying || !info.title.isEmpty {
-                completion(info); return
-            }
-            completion(Info(title: "", artist: "", album: "", isPlaying: false))
-        }
-    }
-
-    private static func query(app: String) -> Info? {
-        let script = """
-        if application "\(app)" is running then
-            tell application "\(app)"
-                try
-                    set t to name of current track
-                    set a to artist of current track
-                    set al to album of current track
-                    set s to player state as string
-                    return t & "|||" & a & "|||" & al & "|||" & s
-                on error
-                    return "|||" & "|||" & "|||" & "stopped"
-                end try
-            end if
-            return "|||" & "|||" & "|||" & "stopped"
-        end if
-        """
-        guard let out = runAppleScript(script) else { return nil }
-        let parts = out.components(separatedBy: "|||")
-        guard parts.count == 4 else { return nil }
-        let state = parts[3].lowercased()
-        return Info(
-            title: parts[0].trimmingCharacters(in: .whitespacesAndNewlines),
-            artist: parts[1].trimmingCharacters(in: .whitespacesAndNewlines),
-            album: parts[2].trimmingCharacters(in: .whitespacesAndNewlines),
-            isPlaying: state.contains("playing")
-        )
-    }
-
-    static func run(_ command: String) {
-        let script = """
-        if application "Spotify" is running then
-            tell application "Spotify" to \(command)
-        else if application "Music" is running then
-            tell application "Music" to \(command)
-        end if
-        """
-        _ = runAppleScript(script)
-    }
-
-    private static func runAppleScript(_ source: String) -> String? {
-        var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return nil }
-        let result = script.executeAndReturnError(&error)
-        if error != nil { return nil }
-        return result.stringValue
-    }
 }
