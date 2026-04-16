@@ -43,7 +43,6 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     section("Appearance") {
                         Toggle("Show Island", isOn: $settings.visible)
-                        Toggle("Expand on hover", isOn: $settings.expandOnHover)
                         Toggle("Show album artwork when expanded", isOn: $settings.showArtwork)
                     }
                     section("Position") {

@@ -27,10 +27,8 @@ struct IslandNotification: Equatable {
 
 final class NotificationMonitor: ObservableObject {
     @Published var activeNotification: IslandNotification?
-    @Published var hasWindowsUnderneath = false
 
     private var pollTimer: Timer?
-    private var panelFrame: CGRect = .zero // in CG screen coords (top-left origin)
     private var autoDismissWork: DispatchWorkItem?
 
     init() {
@@ -43,63 +41,13 @@ final class NotificationMonitor: ObservableObject {
         DistributedNotificationCenter.default().removeObserver(self)
     }
 
-    /// Call whenever the panel moves or resizes.  Pass the NSWindow frame — it will be
-    /// converted to CG screen coordinates (top-left origin) internally.
-    func updatePanelFrame(_ nsFrame: NSRect) {
-        guard let screen = NSScreen.main else { return }
-        let screenH = screen.frame.height
-        panelFrame = CGRect(
-            x: nsFrame.origin.x,
-            y: screenH - nsFrame.origin.y - nsFrame.height,
-            width: nsFrame.width,
-            height: nsFrame.height
-        )
-    }
-
     // MARK: - Polling
 
     private func startPolling() {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.checkWindowsUnderneath()
             self.checkForCalls()
             self.checkForNotificationBanners()
-        }
-    }
-
-    // MARK: - Windows underneath (for transparency)
-
-    private let ignoredProcesses: Set<String> = [
-        "Island", "Window Server", "Dock", "SystemUIServer",
-        "Control Center", "Spotlight", "NotificationCenter", "Wallpaper"
-    ]
-
-    private func checkWindowsUnderneath() {
-        guard !panelFrame.isEmpty else { return }
-        guard let list = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] else { return }
-
-        var found = false
-        for win in list {
-            guard let name = win[kCGWindowOwnerName as String] as? String,
-                  !ignoredProcesses.contains(name),
-                  let layer = win[kCGWindowLayer as String] as? Int,
-                  layer == 0,
-                  let b = win[kCGWindowBounds as String] as? [String: CGFloat],
-                  let x = b["X"], let y = b["Y"],
-                  let w = b["Width"], let h = b["Height"] else { continue }
-
-            if CGRect(x: x, y: y, width: w, height: h).intersects(panelFrame) {
-                found = true
-                break
-            }
-        }
-
-        DispatchQueue.main.async {
-            if self.hasWindowsUnderneath != found {
-                self.hasWindowsUnderneath = found
-            }
         }
     }
 

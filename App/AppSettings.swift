@@ -10,9 +10,6 @@ final class AppSettings: ObservableObject {
     @Published var verticalOffset: Double {
         didSet { save(); notify() }
     }
-    @Published var expandOnHover: Bool {
-        didSet { save() }
-    }
     @Published var showArtwork: Bool {
         didSet { save() }
     }
@@ -22,14 +19,12 @@ final class AppSettings: ObservableObject {
     init() {
         self.visible = defaults.object(forKey: "visible") as? Bool ?? true
         self.verticalOffset = defaults.object(forKey: "verticalOffset") as? Double ?? 0
-        self.expandOnHover = defaults.object(forKey: "expandOnHover") as? Bool ?? true
         self.showArtwork = defaults.object(forKey: "showArtwork") as? Bool ?? true
     }
 
     private func save() {
         defaults.set(visible, forKey: "visible")
         defaults.set(verticalOffset, forKey: "verticalOffset")
-        defaults.set(expandOnHover, forKey: "expandOnHover")
         defaults.set(showArtwork, forKey: "showArtwork")
     }
 

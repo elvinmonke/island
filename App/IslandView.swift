@@ -12,7 +12,7 @@ struct IslandView: View {
     private var state: IslandState {
         if vm.activeNotification?.kind == .call { return .call }
         if vm.activeNotification != nil { return .notification }
-        if hovering && settings.expandOnHover { return .expanded }
+        if hovering { return .expanded }
         if vm.isPlaying { return .active }
         return .idle
     }
@@ -22,42 +22,44 @@ struct IslandView: View {
         case .idle:          return 190
         case .active:        return 340
         case .expanded:      return 420
-        case .notification:  return hovering ? 400 : 340
-        case .call:          return hovering ? 420 : 360
+        case .notification:  return 340
+        case .call:          return 360
         }
     }
 
     private var pillHeight: CGFloat {
         switch state {
-        case .idle:          return 34
-        case .active:        return 38
-        case .expanded:      return 150
-        case .notification:  return hovering ? 90 : 50
-        case .call:          return hovering ? 140 : 54
+        case .idle:          return 10
+        case .active:        return 48
+        case .expanded:      return 160
+        case .notification:  return 52
+        case .call:          return 140
         }
     }
 
+    // Idle = fully rounded capsule that blends into the notch bottom edge
+    // Active+ = tight top corners flush with notch, rounded bottom as it drops down
     private var topRadius: CGFloat {
-        state == .idle ? pillHeight / 2 : 12
+        state == .idle ? pillHeight / 2 : 10
     }
 
     private var bottomRadius: CGFloat {
-        pillHeight / 2
-    }
-
-    /// Semi-transparent when normal windows sit behind the Island
-    private var pillOpacity: Double {
-        if state == .call || state == .notification { return 1.0 }
-        if hovering { return 1.0 }
-        if vm.hasWindowsUnderneath { return 0.45 }
-        return 1.0
+        switch state {
+        case .idle: return pillHeight / 2
+        default: return 22
+        }
     }
 
     var body: some View {
         GeometryReader { geo in
             VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    Spacer()
+                ZStack(alignment: .top) {
+                    // Invisible hover zone covering the notch area so the user
+                    // can trigger expansion by mousing over where the notch is
+                    Color.clear
+                        .frame(width: 200, height: 34)
+
+                    // The actual pill — drops down from notch
                     ZStack {
                         UnevenRoundedRectangle(
                             topLeadingRadius: topRadius,
@@ -66,8 +68,8 @@ struct IslandView: View {
                             topTrailingRadius: topRadius
                         )
                         .fill(Color(white: 0.04))
-                        .shadow(color: .black.opacity(state == .idle ? 0.2 : 0.45),
-                                radius: state == .expanded || state == .call ? 28 : 10, y: 6)
+                        .shadow(color: .black.opacity(state == .idle ? 0 : 0.5),
+                                radius: state == .expanded || state == .call ? 28 : 12, y: 8)
 
                         Group {
                             switch state {
@@ -78,72 +80,74 @@ struct IslandView: View {
                             case .expanded:
                                 ExpandedContent()
                             case .notification:
-                                NotificationContent(isHovering: hovering)
+                                NotificationContent()
                             case .call:
-                                CallContent(isHovering: hovering)
+                                CallContent()
                             }
                         }
                         .clipped()
                     }
                     .frame(width: pillWidth, height: pillHeight)
-                    .opacity(pillOpacity)
-                    .onHover { h in
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
-                            hovering = h
-                        }
-                        vm.isHovering = h
-                    }
-                    Spacer()
                 }
+                .frame(width: max(pillWidth, 200), height: max(pillHeight, 34))
+                .contentShape(Rectangle())
+                .onHover { h in
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.74)) {
+                        hovering = h
+                    }
+                    vm.isHovering = h
+                }
+
                 Spacer()
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.72), value: state)
-        .animation(.easeInOut(duration: 0.3), value: vm.hasWindowsUnderneath)
+        .animation(.spring(response: 0.45, dampingFraction: 0.74), value: state)
     }
 }
 
-// MARK: - Idle
+// MARK: - Idle: thin sliver fused into the notch
 
 struct IdleContent: View {
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Circle()
-                .fill(Color.green.opacity(0.5))
-                .frame(width: 5, height: 5)
+                .fill(Color.green.opacity(0.6))
+                .frame(width: 4, height: 4)
             Circle()
                 .fill(Color.white.opacity(0.3))
-                .frame(width: 5, height: 5)
+                .frame(width: 4, height: 4)
         }
     }
 }
 
-// MARK: - Active (music playing)
+// MARK: - Active: pops out with album cover left, waveform right
 
 struct ActiveContent: View {
     @EnvironmentObject var vm: IslandViewModel
 
     var body: some View {
         HStack(spacing: 0) {
+            // Album cover (left)
             ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(LinearGradient(
                         colors: [.pink, .purple],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))
                 Image(systemName: "music.note")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
             }
-            .frame(width: 24, height: 24)
-            .padding(.leading, 8)
+            .frame(width: 32, height: 32)
+            .padding(.leading, 10)
 
             Spacer()
 
+            // Song title (center)
             Text(vm.title.isEmpty ? "Island" : vm.title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -151,8 +155,9 @@ struct ActiveContent: View {
 
             Spacer()
 
+            // Waveform bars (right)
             WaveformBars(isPlaying: vm.isPlaying)
-                .padding(.trailing, 10)
+                .padding(.trailing, 12)
         }
     }
 }
@@ -186,7 +191,7 @@ struct WaveformBars: View {
     }
 }
 
-// MARK: - Expanded (hover on music)
+// MARK: - Expanded: full music controls (drops down on hover)
 
 struct ExpandedContent: View {
     @EnvironmentObject var vm: IslandViewModel
@@ -235,74 +240,36 @@ struct ExpandedContent: View {
     }
 }
 
-// MARK: - Notification (general)
+// MARK: - Notification
 
 struct NotificationContent: View {
     @EnvironmentObject var vm: IslandViewModel
-    var isHovering: Bool
 
     var body: some View {
         if let notif = vm.activeNotification {
-            if isHovering {
-                // Expanded notification
-                VStack(spacing: 8) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(notif.title)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                            if !notif.subtitle.isEmpty {
-                                Text(notif.subtitle)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.white.opacity(0.5))
-                                    .lineLimit(2)
-                            }
-                        }
-                        Spacer()
-                        Button { vm.dismissNotification() } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.5))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 16)
+            HStack(spacing: 10) {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.yellow)
+                    .padding(.leading, 14)
+
+                Text(notif.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                Button { vm.dismissNotification() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.4))
                 }
-                .transition(.opacity)
-            } else {
-                // Compact notification
-                HStack(spacing: 10) {
-                    Image(systemName: "bell.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.yellow)
-                        .padding(.leading, 14)
-
-                    Text(notif.title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Spacer()
-
-                    Text(timeAgo(notif.timestamp))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.35))
-                        .padding(.trailing, 14)
-                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 12)
             }
         }
-    }
-
-    private func timeAgo(_ date: Date) -> String {
-        let seconds = Int(-date.timeIntervalSinceNow)
-        if seconds < 5 { return "now" }
-        if seconds < 60 { return "\(seconds)s" }
-        return "\(seconds / 60)m"
     }
 }
 
@@ -310,79 +277,9 @@ struct NotificationContent: View {
 
 struct CallContent: View {
     @EnvironmentObject var vm: IslandViewModel
-    var isHovering: Bool
-
     @State private var pulseRing = false
 
     var body: some View {
-        if isHovering {
-            expandedCall
-                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
-        } else {
-            compactCall
-                .transition(.opacity)
-        }
-    }
-
-    // Compact: icon + title + small accept/decline
-    private var compactCall: some View {
-        HStack(spacing: 0) {
-            // Pulsing phone icon
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(pulseRing ? 0.0 : 0.3))
-                    .frame(width: pulseRing ? 30 : 22, height: pulseRing ? 30 : 22)
-                Image(systemName: "phone.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.green)
-            }
-            .frame(width: 36, height: 36)
-            .padding(.leading, 6)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                    pulseRing = true
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(vm.activeNotification?.title ?? "Incoming Call")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(vm.activeNotification?.subtitle ?? "")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            // Decline
-            Button { vm.declineCall() } label: {
-                Image(systemName: "phone.down.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.red))
-            }
-            .buttonStyle(.plain)
-
-            // Accept
-            Button { vm.acceptCall() } label: {
-                Image(systemName: "phone.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.green))
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 8)
-            .padding(.trailing, 10)
-        }
-    }
-
-    // Expanded: larger layout with big buttons
-    private var expandedCall: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 ZStack {
@@ -417,7 +314,6 @@ struct CallContent: View {
             .padding(.top, 4)
 
             HStack(spacing: 40) {
-                // Decline
                 Button { vm.declineCall() } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "phone.down.fill")
@@ -432,7 +328,6 @@ struct CallContent: View {
                 }
                 .buttonStyle(.plain)
 
-                // Accept
                 Button { vm.acceptCall() } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "phone.fill")
@@ -449,6 +344,7 @@ struct CallContent: View {
             }
             .padding(.bottom, 4)
         }
+        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
     }
 }
 

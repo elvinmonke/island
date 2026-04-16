@@ -22,7 +22,6 @@ final class IslandViewModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.refresh()
         }
-        // Forward notification monitor changes so SwiftUI picks them up
         notificationMonitor.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.objectWillChange.send() }
@@ -34,7 +33,6 @@ final class IslandViewModel: ObservableObject {
     // MARK: - Notification shortcuts
 
     var activeNotification: IslandNotification? { notificationMonitor.activeNotification }
-    var hasWindowsUnderneath: Bool { notificationMonitor.hasWindowsUnderneath }
 
     func acceptCall() { notificationMonitor.acceptCall() }
     func declineCall() { notificationMonitor.declineCall() }
