@@ -7,6 +7,7 @@ final class IslandViewModel: ObservableObject {
     @Published var artist: String = ""
     @Published var isPlaying: Bool = false
     @Published var forceExpanded: Bool = false
+    @Published var isHovering: Bool = false
     @Published var album: String = ""
 
     var hasContent: Bool { !title.isEmpty }

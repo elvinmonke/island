@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 final class IslandPanel: NSPanel {
     override var canBecomeKey: Bool { false }
@@ -10,20 +11,52 @@ final class IslandWindowController {
     private var panel: IslandPanel?
     let viewModel: IslandViewModel
     let settings: AppSettings
+    private var cancellables = Set<AnyCancellable>()
+
+    private let shadowPad: CGFloat = 40
 
     init(viewModel: IslandViewModel, settings: AppSettings) {
         self.viewModel = viewModel
         self.settings = settings
+
         NotificationCenter.default.addObserver(
             forName: AppSettings.changed, object: nil, queue: .main
-        ) { [weak self] _ in self?.reposition() }
+        ) { [weak self] _ in self?.resize() }
+
+        viewModel.$isHovering
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
+
+        viewModel.$isPlaying
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
+    }
+
+    private var currentState: IslandState {
+        if viewModel.isHovering && settings.expandOnHover { return .expanded }
+        if viewModel.isPlaying { return .active }
+        return .idle
+    }
+
+    private var pillSize: NSSize {
+        switch currentState {
+        case .idle:    return NSSize(width: 190, height: 34)
+        case .active:  return NSSize(width: 340, height: 38)
+        case .expanded: return NSSize(width: 420, height: 150)
+        }
     }
 
     func show() {
         guard panel == nil else { return }
-        let size = NSSize(width: 560, height: 200)
+        let ps = pillSize
+        let winSize = NSSize(
+            width: ps.width + shadowPad * 2,
+            height: ps.height + shadowPad
+        )
         let p = IslandPanel(
-            contentRect: NSRect(origin: .zero, size: size),
+            contentRect: NSRect(origin: .zero, size: winSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -42,30 +75,38 @@ final class IslandWindowController {
                 .environmentObject(viewModel)
                 .environmentObject(settings)
         )
-        host.frame = NSRect(origin: .zero, size: size)
+        host.frame = NSRect(origin: .zero, size: winSize)
         host.autoresizingMask = [.width, .height]
         p.contentView = host
         panel = p
-        reposition()
+        resize()
         if settings.visible { p.orderFrontRegardless() }
     }
 
-    func reposition() {
+    func resize() {
         guard let p = panel else { return }
         let screen = NSScreen.main ?? NSScreen.screens.first!
-        let size = p.frame.size
+        let ps = pillSize
+        let winSize = NSSize(
+            width: ps.width + shadowPad * 2,
+            height: ps.height + shadowPad
+        )
 
-        // Position just below the notch/menu bar so content is never obscured.
-        // safeAreaInsets.top > 0 means there's a notch.
         let hasNotch = screen.safeAreaInsets.top > 0
         let topY = hasNotch
             ? screen.frame.maxY - screen.safeAreaInsets.top
             : screen.visibleFrame.maxY
+
         let origin = NSPoint(
-            x: screen.frame.midX - size.width / 2,
-            y: topY - size.height - CGFloat(settings.verticalOffset)
+            x: screen.frame.midX - winSize.width / 2,
+            y: topY - winSize.height - CGFloat(settings.verticalOffset)
         )
-        p.setFrameOrigin(origin)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.45
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            p.animator().setFrame(NSRect(origin: origin, size: winSize), display: true)
+        }
 
         if settings.visible {
             p.orderFrontRegardless()
@@ -76,6 +117,6 @@ final class IslandWindowController {
 
     func toggle() {
         settings.visible.toggle()
-        reposition()
+        resize()
     }
 }

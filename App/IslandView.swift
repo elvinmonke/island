@@ -74,6 +74,7 @@ struct IslandView: View {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
                             hovering = h
                         }
+                        vm.isHovering = h
                     }
                     Spacer()
                 }

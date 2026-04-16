@@ -3,7 +3,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 APP="build/Release/Island.app"
-DMG="build/Island-1.1.3.dmg"
+DMG="build/Island-1.1.4.dmg"
 STAGING="build/dmg_staging"
 
 if [ ! -d "$APP" ]; then
