@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum IslandState: Equatable {
-    case idle, active, expanded, hud, notification, call
+    case idle, active, expanded, hud, lock, notification, call
 }
 
 // MARK: - Main View
@@ -12,6 +12,7 @@ struct IslandView: View {
     @State private var hovering = false
 
     private var state: IslandState {
+        if vm.lockState != nil { return .lock }
         if vm.activeHUD != nil { return .hud }
         if vm.activeNotification?.kind == .call { return .call }
         if vm.activeNotification != nil { return .notification }
@@ -26,6 +27,7 @@ struct IslandView: View {
         case .active:       return 340
         case .expanded:     return 440
         case .hud:          return 280
+        case .lock:         return 240
         case .notification: return 340
         case .call:         return 360
         }
@@ -37,6 +39,7 @@ struct IslandView: View {
         case .active:       return 48
         case .expanded:     return 240
         case .hud:          return 48
+        case .lock:         return 48
         case .notification: return 52
         case .call:         return 140
         }
@@ -65,6 +68,7 @@ struct IslandView: View {
                             case .active:       ActiveContent()
                             case .expanded:     ExpandedContent()
                             case .hud:          if let hud = vm.activeHUD { HUDContent(kind: hud) }
+                            case .lock:         if let lock = vm.lockState { LockContent(state: lock) }
                             case .notification: NotificationContent()
                             case .call:         CallContent()
                             }
@@ -588,6 +592,80 @@ struct HUDContent: View {
         if v < 0.33 { return "speaker.wave.1.fill" }
         if v < 0.66 { return "speaker.wave.2.fill" }
         return "speaker.wave.3.fill"
+    }
+}
+
+// MARK: - Lock / Unlock
+
+struct LockContent: View {
+    let state: LockState
+    @State private var iconScale: CGFloat = 0.3
+    @State private var iconOpacity: Double = 0
+    @State private var shakeOffset: CGFloat = 0
+    @State private var unlocked = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: lockIcon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(state == .unlocking ? .green : .white)
+                .scaleEffect(iconScale)
+                .opacity(iconOpacity)
+                .offset(x: shakeOffset)
+                .symbolEffect(.bounce, value: unlocked)
+
+            Text(state == .locking ? "Locked" : "Unlocked")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .opacity(iconOpacity)
+        }
+        .onAppear { animate() }
+    }
+
+    private var lockIcon: String {
+        if state == .unlocking && unlocked {
+            return "lock.open.fill"
+        }
+        return "lock.fill"
+    }
+
+    private func animate() {
+        if state == .locking {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                iconScale = 1.0
+                iconOpacity = 1.0
+            }
+            // Shake after dropping in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.easeInOut(duration: 0.08).repeatCount(3, autoreverses: true)) {
+                    shakeOffset = 4
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.easeOut(duration: 0.1)) { shakeOffset = 0 }
+                }
+            }
+            // Fade out
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                withAnimation(.easeOut(duration: 0.5)) { iconOpacity = 0 }
+            }
+        } else {
+            iconScale = 1.0
+            iconOpacity = 1.0
+            // Spring open the lock
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.5)) {
+                    unlocked = true
+                    iconScale = 1.2
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.easeOut(duration: 0.3)) { iconScale = 1.0 }
+            }
+            // Fade out
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                withAnimation(.easeOut(duration: 0.5)) { iconOpacity = 0 }
+            }
+        }
     }
 }
 

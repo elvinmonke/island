@@ -48,9 +48,15 @@ final class IslandWindowController {
             .removeDuplicates()
             .sink { [weak self] _ in self?.resize() }
             .store(in: &cancellables)
+
+        viewModel.$lockState
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
     }
 
     private var currentState: IslandState {
+        if viewModel.lockState != nil { return .lock }
         if viewModel.activeHUD != nil { return .hud }
         if viewModel.notificationMonitor.activeNotification?.kind == .call { return .call }
         if viewModel.notificationMonitor.activeNotification != nil { return .notification }
@@ -65,6 +71,7 @@ final class IslandWindowController {
         case .active:       return NSSize(width: 340, height: 48)
         case .expanded:     return NSSize(width: 440, height: 240)
         case .hud:          return NSSize(width: 280, height: 48)
+        case .lock:         return NSSize(width: 240, height: 48)
         case .notification: return NSSize(width: 340, height: 52)
         case .call:         return NSSize(width: 360, height: 140)
         }

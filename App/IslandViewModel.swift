@@ -7,6 +7,10 @@ enum HUDKind: Equatable {
     case brightness(Float)
 }
 
+enum LockState: Equatable {
+    case locking, unlocking
+}
+
 enum ActivityTab: Int, CaseIterable {
     case nowPlaying, calendar, battery, timer
 }
@@ -17,6 +21,7 @@ final class IslandViewModel: ObservableObject {
     @Published var activeTab: ActivityTab = .nowPlaying
     @Published var isHovering: Bool = false
     @Published var activeHUD: HUDKind? = nil
+    @Published var lockState: LockState? = nil
 
     let volumeMonitor = VolumeMonitor()
     let brightnessMonitor = BrightnessMonitor()
@@ -32,6 +37,7 @@ final class IslandViewModel: ObservableObject {
     private let mediaRemote = MediaRemoteBridge.shared
     private var cancellables = Set<AnyCancellable>()
     private var hudDismissWork: DispatchWorkItem?
+    private var lockDismissWork: DispatchWorkItem?
     private var elapsedTimer: Timer?
     private var pollTimer: Timer?
 
@@ -40,6 +46,7 @@ final class IslandViewModel: ObservableObject {
         fetchNowPlaying()
         setupObservers()
         startElapsedTimer()
+        registerLockNotifications()
     }
 
     private func setupObservers() {
@@ -142,6 +149,42 @@ final class IslandViewModel: ObservableObject {
         let tabs = ActivityTab.allCases
         guard let idx = tabs.firstIndex(of: activeTab) else { return }
         activeTab = tabs[(idx + 1) % tabs.count]
+    }
+
+    // MARK: - Lock / Unlock
+
+    private func registerLockNotifications() {
+        let center = DistributedNotificationCenter.default()
+
+        center.addObserver(
+            forName: NSNotification.Name("com.apple.screenIsLocked"),
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.handleLock() }
+
+        center.addObserver(
+            forName: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.handleUnlock() }
+    }
+
+    private func handleLock() {
+        lockDismissWork?.cancel()
+        lockState = .locking
+        let work = DispatchWorkItem { [weak self] in
+            self?.lockState = nil
+        }
+        lockDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: work)
+    }
+
+    private func handleUnlock() {
+        lockDismissWork?.cancel()
+        lockState = .unlocking
+        let work = DispatchWorkItem { [weak self] in
+            self?.lockState = nil
+        }
+        lockDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: work)
     }
 
     // MARK: - Notification shortcuts
