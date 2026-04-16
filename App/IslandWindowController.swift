@@ -32,19 +32,30 @@ final class IslandWindowController {
             .removeDuplicates()
             .sink { [weak self] _ in self?.resize() }
             .store(in: &cancellables)
+
+        // React to notification changes
+        viewModel.notificationMonitor.$activeNotification
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.resize() }
+            .store(in: &cancellables)
     }
 
     private var currentState: IslandState {
+        if viewModel.notificationMonitor.activeNotification?.kind == .call { return .call }
+        if viewModel.notificationMonitor.activeNotification != nil { return .notification }
         if viewModel.isHovering && settings.expandOnHover { return .expanded }
         if viewModel.isPlaying { return .active }
         return .idle
     }
 
     private var pillSize: NSSize {
+        let hovering = viewModel.isHovering
         switch currentState {
-        case .idle:    return NSSize(width: 190, height: 34)
-        case .active:  return NSSize(width: 340, height: 38)
-        case .expanded: return NSSize(width: 420, height: 150)
+        case .idle:          return NSSize(width: 190, height: 34)
+        case .active:        return NSSize(width: 340, height: 38)
+        case .expanded:      return NSSize(width: 420, height: 150)
+        case .notification:  return NSSize(width: hovering ? 400 : 340, height: hovering ? 90 : 50)
+        case .call:          return NSSize(width: hovering ? 420 : 360, height: hovering ? 140 : 54)
         }
     }
 
@@ -102,11 +113,16 @@ final class IslandWindowController {
             y: topY - winSize.height - CGFloat(settings.verticalOffset)
         )
 
+        let frame = NSRect(origin: origin, size: winSize)
+
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.45
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            p.animator().setFrame(NSRect(origin: origin, size: winSize), display: true)
+            p.animator().setFrame(frame, display: true)
         }
+
+        // Feed the panel frame to the notification monitor for window-underneath detection
+        viewModel.notificationMonitor.updatePanelFrame(frame)
 
         if settings.visible {
             p.orderFrontRegardless()

@@ -10,18 +10,37 @@ final class IslandViewModel: ObservableObject {
     @Published var isHovering: Bool = false
     @Published var album: String = ""
 
+    let notificationMonitor = NotificationMonitor()
+
     var hasContent: Bool { !title.isEmpty }
 
     private var timer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+        // Forward notification monitor changes so SwiftUI picks them up
+        notificationMonitor.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     deinit { timer?.invalidate() }
+
+    // MARK: - Notification shortcuts
+
+    var activeNotification: IslandNotification? { notificationMonitor.activeNotification }
+    var hasWindowsUnderneath: Bool { notificationMonitor.hasWindowsUnderneath }
+
+    func acceptCall() { notificationMonitor.acceptCall() }
+    func declineCall() { notificationMonitor.declineCall() }
+    func dismissNotification() { notificationMonitor.dismissNotification() }
+
+    // MARK: - Now Playing
 
     func refresh() {
         NowPlaying.fetch { [weak self] info in
