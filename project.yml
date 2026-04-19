@@ -17,7 +17,7 @@ targets:
           - "XPCHelper/"
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.elvin.island
-      MARKETING_VERSION: 2.0.0
+      MARKETING_VERSION: 2.1.0
       CURRENT_PROJECT_VERSION: 1
       INFOPLIST_FILE: App/Info.plist
       SWIFT_VERSION: "5.9"
