@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Island"
 APP="build/Release/${APP_NAME}.app"
-DMG="build/${APP_NAME}-1.1.4.dmg"
+DMG="build/${APP_NAME}-2.0.0.dmg"
 STAGING="build/dmg_staging"
 VOLUME_NAME="$APP_NAME"
 BG_IMG="scripts/dmg_background@2x.png"

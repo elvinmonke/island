@@ -14,6 +14,7 @@ targets:
       - path: App/
         excludes:
           - "**/*.iconset"
+          - "XPCHelper/"
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.elvin.island
       MARKETING_VERSION: 2.0.0
@@ -30,5 +31,6 @@ targets:
       - Combine
       - ScriptingBridge
       - CoreAudio
+      - AudioToolbox
       - EventKit
       - IOKit

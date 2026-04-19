@@ -20,7 +20,16 @@ final class CalendarMonitor: ObservableObject {
     private var timer: Timer?
 
     init() {
-        requestAccess()
+        checkCurrentStatus()
+    }
+
+    private func checkCurrentStatus() {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if status == .fullAccess || status == .authorized {
+            hasAccess = true
+            fetchEvents()
+            startPolling()
+        }
     }
 
     deinit { timer?.invalidate() }

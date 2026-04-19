@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        viewModel.settings = settingsModel
         islandController = IslandWindowController(
             viewModel: viewModel, settings: settingsModel
         )
